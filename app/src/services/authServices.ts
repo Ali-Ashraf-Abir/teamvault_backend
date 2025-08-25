@@ -3,7 +3,13 @@ import { hashPassword } from '../utils/hash'; // your argon2/bcrypt wrapper
 import type { CreateUserDTO } from "../models/User"; // from your Zod schema
 
 export async function createUserService(input: CreateUserDTO) {
+
+const existUser = await prisma.user.findUnique({where:{email:input.email}})
+if(existUser){
+  return { ok: false as const, message: "Email Taken" };
+}
 const passwordHash = await hashPassword(input.password);
+
 
 try {
  const user = await prisma.user.create({
@@ -17,10 +23,6 @@ try {
  });
  return { ok: true as const, user };
 } catch (e: any) {
- if (e.code === "P2002") {
-   // Unique constraint violation on email
-   return { ok: false as const, code: "EMAIL_TAKEN" };
- }
  throw e; // let controller handle unexpected errors
 }
 }

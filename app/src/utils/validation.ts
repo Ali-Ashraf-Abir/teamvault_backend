@@ -12,7 +12,7 @@ export function validate<T extends ZodObject>(
         path: i.path.join("."),
         message: i.message,
       }));
-      return res.status(400).json({ error: "Validation failed", errors });
+      return res.status(400).json({ok:false, error:{ code: "VALIDATION_ERROR", message: "Validation failed", errors }});
     }
     // replace with parsed, coerced, trimmed data
     req[source] = result.data;
