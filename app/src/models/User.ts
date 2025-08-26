@@ -19,4 +19,15 @@ export const createUserModel = z.object({
     z.string().min(1, "Last name required").max(80)
   ),
 });
+
+export const loginUserModel = z.object({
+  email: z.preprocess(
+    v => typeof v === "string" ? v.trim().toLowerCase() : v,
+    z.string().email("Invalid email format")
+  ),
+  password: z.string()
+   
+});
+
 export type CreateUserDTO = z.infer<typeof createUserModel>;
+export type LoginUserDTO  = z.infer<typeof loginUserModel>;

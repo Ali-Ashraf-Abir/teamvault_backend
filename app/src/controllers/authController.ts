@@ -1,7 +1,10 @@
 import { Request, Response, Router } from "express";
-import { createUserService } from "../services/authServices";
+import { createUserService, loginUserService, refreshTokenService } from "../services/authServices";
 import { validate } from "../utils/validation";
 import { fail } from "../utils/http";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/generateToken";
+import { setRefreshCookie } from "../utils/setRefreshToken";
+
 
 
 const createUserController = async (req: Request, res: Response) => {
@@ -9,12 +12,44 @@ const createUserController = async (req: Request, res: Response) => {
     const userData = req.body
 
     const result = await createUserService(userData)
-    if(!result.ok){
-        return fail(res,result.message,'Email is already in use')
+    if (!result.ok) {
+        return fail(res, result.message, 'Email is already in use')
     }
     console.log(result)
-    return res.json({message:"Registration Successfull"});
+    return res.json({ message: "Registration Successfull" });
 
 };
 
-export {createUserController};
+const loginUserController = async (req: Request, res: Response) => {
+
+    const validUser = await loginUserService(req.body)
+    if (!validUser.ok) {
+        return fail(res, validUser.message, 'Invalid Credentials')
+    }
+
+    const accessToken = signAccessToken({ userId: validUser.id })
+    const refreshToken = signRefreshToken({ userId: validUser.id, tokenVersion: validUser.tokenVersion })
+    setRefreshCookie(res, refreshToken)
+    res.send({ accessToken });
+};
+
+
+
+
+export async function refresh(req: Request, res: Response) {
+    const rtCookie = req.cookies?.rt;
+    if (!rtCookie) return res.status(401).json({ ok: false, error: "No refresh token" });
+    const result = await refreshTokenService(rtCookie);
+
+    if (!result.ok) {
+        res.clearCookie("rt", { path: "/auth/refresh" });
+        return fail(res, result.message, "Refresh token expired/invalid");
+    } 
+
+     setRefreshCookie(res, result.refreshToken);
+     res.send({ accessToken: result.accessToken });
+
+}
+
+
+export { createUserController, loginUserController };

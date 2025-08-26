@@ -1,28 +1,69 @@
 import { prisma } from "../../db/prisma";
 import { hashPassword } from '../utils/hash'; // your argon2/bcrypt wrapper
-import type { CreateUserDTO } from "../models/User"; // from your Zod schema
+import type { CreateUserDTO, LoginUserDTO } from "../models/User"; // from your Zod schema
+import argon2 from "argon2";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/generateToken";
+import { Response } from "express";
+import { setRefreshCookie } from "../utils/setRefreshToken";
 
 export async function createUserService(input: CreateUserDTO) {
 
-const existUser = await prisma.user.findUnique({where:{email:input.email}})
-if(existUser){
-  return { ok: false as const, message: "Email Taken" };
-}
-const passwordHash = await hashPassword(input.password);
+  const existUser = await prisma.user.findUnique({ where: { email: input.email } })
+  if (existUser) {
+    return { ok: false as const, message: "Email Taken" };
+  }
+  const passwordHash = await hashPassword(input.password);
 
 
-try {
- const user = await prisma.user.create({
-   data: {
-     email: input.email,
-     password:passwordHash,
-     first_name: input.first_name,
-     last_name: input.last_name,
-   },
-   select: { id: true, email: true,first_name:true,last_name:true }, // never return hashes
- });
- return { ok: true as const, user };
-} catch (e: any) {
- throw e; // let controller handle unexpected errors
+  try {
+    const user = await prisma.user.create({
+      data: {
+        email: input.email,
+        passwordHash: passwordHash,
+        firstName: input.first_name,
+        lastName: input.last_name,
+      },
+      select: { userId: true, email: true, firstName: true, lastName: true }, // never return hashes
+    });
+    return { ok: true as const, user };
+  } catch (e: any) {
+    throw e; // let controller handle unexpected errors
+  }
 }
+
+export async function loginUserService(data: LoginUserDTO) {
+  const { email, password } = data
+
+  const user = await prisma.user.findUnique({ where: { email } })
+
+  if (!user) {
+    return { ok: false as const, message: "User not found" };
+  }
+
+  const verifiedPass = await argon2.verify(user.passwordHash, password)
+  if (verifiedPass) {
+    return { ok: true as const, messge: 'valid user', id: user.userId, tokenVersion: user.tokenVersion };
+  }
+  return { ok: false as const, message: "Invalid Password" };
+
+}
+
+
+export async function refreshTokenService(rtCookie:string) {
+  try {
+    const payload = verifyRefreshToken(rtCookie);
+    const user = await prisma.user.findUnique({ where: { userId: payload.userId } });
+    if (!user || user.tokenVersion !== payload.tokenVersion) {
+      return { ok: false, message: "Refresh token invalid" ,accessToken:'',refreshToken:'' };
+    }
+
+    const newAT = signAccessToken({ userId: user.userId });
+    const newRT = signRefreshToken({ userId: user.userId, tokenVersion: user.tokenVersion }); // rotate
+   
+    return { ok: true, accessToken: newAT ,refreshToken:newRT,message:'refresh token valid' };
+
+  } catch {
+    return { ok: false, message: "Refresh token expired/invalid",accessToken:'',refreshToken:'' }
+   
+  }
 }

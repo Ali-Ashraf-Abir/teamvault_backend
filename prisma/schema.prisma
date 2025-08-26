@@ -7,21 +7,134 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model Ping {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+/////////////////////////////////
+// ENUMS
+/////////////////////////////////
+
+enum ServerRole {
+  owner
+  admin
+  member
+  guest
 }
 
-model User{
-  id  String   @id @default(cuid())
-  first_name String
-  last_name String
-  password String
-  email String @unique
-  createdAT DateTime @default(now())
+/////////////////////////////////
+// MODELS
+/////////////////////////////////
+
+model User {
+  userId       String   @id @default(uuid()) @db.Uuid
+  firstName    String
+  lastName     String
+  // If you want case-insensitive unique emails, switch to @db.Citext and enable citext extension via a SQL migration.
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  createdServers   Server[]           @relation("ServerCreatedBy")
+  memberships      ServerMembership[]
+  lobbyMemberships LobbyMembership[]
+  sentChats        Chat[]             @relation("ChatSender")
+  readReceipts     ChatReadReceipt[]
+  tokenVersion  Int     @default(0)
+}
+
+model Server {
+  serverId   String   @id @default(uuid()) @db.Uuid
+  serverName String
+  createdBy  String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  creator          User               @relation("ServerCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  members          ServerMembership[]
+  lobbies          Lobby[]
+  chats            Chat[]
+  lobbyMemberships LobbyMembership[]
+
+  @@index([createdBy])
+}
+
+model ServerMembership {
+  // Composite primary key guarantees uniqueness (one membership per user per server)
+  serverId String     @db.Uuid
+  userId   String     @db.Uuid
+  role     ServerRole @default(member)
+  joinedAt DateTime   @default(now())
+
+  server Server @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@id([serverId, userId])
+  @@index([userId])
+}
+
+model Lobby {
+  lobbyId   String   @id @default(uuid()) @db.Uuid
+  serverId  String   @db.Uuid
+  lobbyName String
+  createdAt DateTime @default(now())
+
+  server  Server            @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+  members LobbyMembership[]
+  chats   Chat[]
+
+  // Prevent duplicate lobby names within a server
+  @@unique([serverId, lobbyName])
+  @@index([serverId])
+}
+
+model LobbyMembership {
+  // Per-member lobby access control:
+  // - user must belong to the server (enforced with a composite FK via SQL migration below)
+  // - serverId redundancy enables that composite FK and consistency check
+  lobbyId  String   @db.Uuid
+  userId   String   @db.Uuid
+  serverId String   @db.Uuid
+  role     String? // optional per-lobby role (e.g., "moderator")
+  addedAt  DateTime @default(now())
+
+  lobby  Lobby  @relation(fields: [lobbyId], references: [lobbyId], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  server Server @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+
+  @@id([lobbyId, userId])
+  @@index([userId])
+  @@index([serverId, lobbyId])
+}
+
+model Chat {
+  chatId   String    @id @default(uuid()) @db.Uuid
+  serverId String    @db.Uuid
+  lobbyId  String    @db.Uuid
+  sentBy   String    @db.Uuid
+  message  String
+  sentAt   DateTime  @default(now())
+  editedAt DateTime?
+
+  server          Server            @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+  lobby           Lobby             @relation(fields: [lobbyId], references: [lobbyId], onDelete: Cascade)
+  sender          User              @relation("ChatSender", fields: [sentBy], references: [userId], onDelete: SetNull)
+  ChatReadReceipt ChatReadReceipt[]
+
+  // Hot-path indexes for feeds & moderation views
+  @@index([lobbyId, sentAt(sort: Desc)])
+  @@index([serverId, sentAt(sort: Desc)])
+}
+
+model ChatReadReceipt {
+  chatId String   @db.Uuid
+  userId String   @db.Uuid
+  seenAt DateTime @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [chatId], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@id([chatId, userId])
+  @@index([userId])
 }
