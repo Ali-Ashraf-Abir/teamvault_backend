@@ -26,9 +26,9 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api',authRouter);
 
 // auth api
-app.use(requireAuth)
+// app.use(requireAuth)
+
 // auth protected routes
-app.get('/test', (req: Request, res: Response) => res.send('Hello World!'));
 app.use('/api',serverRouter)
 app.use('/api',userRouter);
 

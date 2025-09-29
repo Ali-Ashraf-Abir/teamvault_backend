@@ -24,6 +24,13 @@ enum ServerRole {
   guest
 }
 
+enum InviteStatus {
+  pending
+  accepted
+  rejected
+  expired
+}
+
 /////////////////////////////////
 // MODELS
 /////////////////////////////////
@@ -32,16 +39,18 @@ model User {
   userId       String   @id @default(uuid()) @db.Uuid
   firstName    String
   lastName     String
-  // If you want case-insensitive unique emails, switch to @db.Citext and enable citext extension via a SQL migration.
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
-
   createdServers   Server[]           @relation("ServerCreatedBy")
   memberships      ServerMembership[]
   lobbyMemberships LobbyMembership[]
   sentChats        Chat[]             @relation("ChatSender")
   readReceipts     ChatReadReceipt[]
+  userInviteLinks ServerInvite[] @relation("inviteCreatedBy")
+  redemptions InviteRedemption[]
+  sentInvites     UserInvite[] @relation("UserInviteSender")
+  receivedInvites UserInvite[] @relation("UserInviteReceiver")
   tokenVersion  Int     @default(0)
 }
 
@@ -57,7 +66,8 @@ model Server {
   lobbies          Lobby[]
   chats            Chat[]
   lobbyMemberships LobbyMembership[]
-
+  inviteLinks      ServerInvite[] 
+  userInvites UserInvite[] @relation("inviteForServer")
   @@index([createdBy])
 }
 
@@ -139,3 +149,56 @@ model ChatReadReceipt {
   @@id([chatId, userId])
   @@index([userId])
 }
+
+
+model ServerInvite {
+  inviteId   String   @id @default(uuid()) @db.Uuid
+  serverId   String   @db.Uuid
+  createdBy  String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  // Invite rules
+  code       String   @unique               // e.g., short random code like "abc123"
+  expiresAt  DateTime?                      // null means no expiry
+  maxUses    Int?                            // null means unlimited
+  uses       Int      @default(0)
+  revoked    Boolean  @default(false)
+
+  server  Server @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+  creator User   @relation("inviteCreatedBy",fields: [createdBy], references: [userId], onDelete: Cascade)
+  redempions InviteRedemption[]
+
+  @@index([serverId])
+  @@index([code])
+}
+
+
+model InviteRedemption {
+  redemptionId String   @id @default(uuid()) @db.Uuid
+  inviteId     String   @db.Uuid
+  userId       String   @db.Uuid
+  redeemedAt   DateTime @default(now())
+
+  invite ServerInvite @relation(fields: [inviteId], references: [inviteId], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([inviteId])
+  @@index([userId])
+}
+
+model UserInvite {
+  inviteId   String   @id @default(uuid()) @db.Uuid
+  serverId   String   @db.Uuid
+  invitedBy  String   @db.Uuid   // who sent the invite
+  invitedUserId String @db.Uuid   // who is being invited
+  createdAt  DateTime @default(now())
+  status     InviteStatus @default(pending)
+
+  server Server @relation("inviteForServer",fields: [serverId], references: [serverId], onDelete: Cascade)
+  sender User   @relation("UserInviteSender", fields: [invitedBy], references: [userId], onDelete: Cascade)
+  invitedUser User @relation("UserInviteReceiver", fields: [invitedUserId], references: [userId], onDelete: Cascade)
+
+  @@index([serverId])
+  @@index([invitedUserId])
+}
+
