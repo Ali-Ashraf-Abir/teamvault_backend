@@ -2,7 +2,7 @@ import { prisma } from "../../db/prisma";
 import { hashPassword } from '../utils/hash'; // your argon2/bcrypt wrapper
 import type { CreateUserDTO, LoginUserDTO } from "../models/User"; // from your Zod schema
 import argon2 from "argon2";
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/generateToken";
+import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from "../utils/generateToken";
 import { Response } from "express";
 import { setRefreshCookie } from "../utils/setRefreshToken";
 
@@ -65,5 +65,18 @@ export async function refreshTokenService(rtCookie:string) {
   } catch {
     return { ok: false, message: "Refresh token expired/invalid",accessToken:'',refreshToken:'' }
    
+  }
+}
+
+
+export async function logoutService(token:string){
+  try {
+    const payload = verifyAccessToken(token);
+    const user = await prisma.user.findUnique({ where: { userId: payload.userId } });
+    if (!user) return { ok: false, message: "User not found" };
+    await prisma.user.update({ where: { userId: user.userId }, data: { tokenVersion: user.tokenVersion + 1 } });
+    return { ok: true, message: "Logout successful" };
+  } catch {
+    return { ok: false, message: "Refresh token expired/invalid" };
   }
 }

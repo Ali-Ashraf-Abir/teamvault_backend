@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express";
-import { createUserService, loginUserService, refreshTokenService } from "../services/authServices";
+import { createUserService, loginUserService, logoutService, refreshTokenService } from "../services/authServices";
 import { validate } from "../utils/validation";
 import { fail } from "../utils/http";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/generateToken";
@@ -38,7 +38,8 @@ const loginUserController = async (req: Request, res: Response) => {
 
 export async function refresh(req: Request, res: Response) {
     const rtCookie = req.cookies?.rt;
-    if (!rtCookie) return res.status(401).json({ ok: false, error: "No refresh token" });
+    console.log(req.cookies)
+    if (!rtCookie) return res.status(400).json({ ok: false, error: "No refresh token" });
     const result = await refreshTokenService(rtCookie);
 
     if (!result.ok) {
@@ -51,5 +52,12 @@ export async function refresh(req: Request, res: Response) {
 
 }
 
+
+export async function logout(req: Request, res: Response) {
+    const token = req.body.token
+    const result = await logoutService(token)
+    res.clearCookie("rt", { path: "/auth/refresh" });
+    return res.sendStatus(200);
+}
 
 export { createUserController, loginUserController };
