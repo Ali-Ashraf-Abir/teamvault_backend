@@ -45,10 +45,10 @@ export async function refresh(req: Request, res: Response) {
     if (!result.ok) {
         res.clearCookie("rt", { path: "/auth/refresh" });
         return fail(res, result.message, "Refresh token expired/invalid");
-    } 
+    }
 
-     setRefreshCookie(res, result.refreshToken);
-     res.send({ accessToken: result.accessToken });
+    setRefreshCookie(res, result.refreshToken);
+    res.send({ accessToken: result.accessToken });
 
 }
 
@@ -56,8 +56,15 @@ export async function refresh(req: Request, res: Response) {
 export async function logout(req: Request, res: Response) {
     const token = req.body.token
     const result = await logoutService(token)
-    res.clearCookie("rt", { path: "/auth/refresh" });
-    return res.sendStatus(200);
+    if (result.ok) {
+        res.clearCookie("rt", { path: "/auth/refresh" });
+        return res.send({ ok: true, message: "logout successfully" });
+    }
+    else {
+        return res.send({ ok: false, message: "invalid login session" })
+    }
+
+
 }
 
 export { createUserController, loginUserController };
