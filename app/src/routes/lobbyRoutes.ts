@@ -13,6 +13,7 @@ router.delete("/deleteLobbyByLobbyId/:lobbyId", LobbyController.deleteLobby);
 
 // Lobby members
 router.post("/addLobbyMembers/:lobbyId/members", LobbyController.addMember);
+router.post("/addMultipleLobbyMembers/:lobbyId/members", LobbyController.addMembers);
 router.delete("/deleteLobbyMembers/:lobbyId/members/:userId", LobbyController.removeMember);
 
 export default router;

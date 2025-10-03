@@ -55,8 +55,8 @@ export const LobbyService = {
     },
 
 
-  // Get all lobbies for a server
-  async getServerLobbies(serverId: string) {
+    // Get all lobbies for a server
+    async getServerLobbies(serverId: string) {
         return prisma.lobby.findMany({
             where: { serverId },
             include: { members: true, chats: true },
@@ -67,11 +67,13 @@ export const LobbyService = {
     async getLobbyById(lobbyId: string) {
         return prisma.lobby.findUnique({
             where: { lobbyId },
-            include: { members: {
-                include:{
-                    user:true,
-                }
-            }, chats: true },
+            include: {
+                members: {
+                    include: {
+                        user: true,
+                    }
+                }, chats: true
+            },
         });
     },
 
@@ -101,6 +103,60 @@ export const LobbyService = {
             },
         });
     },
+
+    async addMembers(lobbyId: string, userIds: string[], role: string | null = null) {
+        const lobby = await prisma.lobby.findUnique({
+            where: { lobbyId },
+            select: { serverId: true },
+        });
+
+        if (!lobby) throw new Error("Lobby not found");
+
+        const serverId = lobby.serverId;
+
+        // 2. Filter out users not in the server
+        const serverMembers = await prisma.serverMembership.findMany({
+            where: {
+                serverId,
+                userId: { in: userIds },
+            },
+            select: { userId: true },
+        });
+
+        const validUserIds = serverMembers.map((m) => m.userId);
+
+        if (validUserIds.length === 0) {
+            return { added: 0, message: "No valid users found (must be server members)" };
+        }
+
+        const existing = await prisma.lobbyMembership.findMany({
+            where: {
+                lobbyId,
+                userId: { in: validUserIds },
+            },
+            select: { userId: true },
+        });
+
+        const existingIds = existing.map((m) => m.userId);
+        const newUserIds = validUserIds.filter((id) => !existingIds.includes(id));
+
+        if (newUserIds.length === 0) {
+            return { added: 0, message: "All users are already in the lobby" };
+        }
+
+        // 4. Prepare data for bulk insert
+        const data = newUserIds.map((userId) => ({
+            lobbyId,
+            serverId,
+            userId,
+            role,
+        }));
+
+        await prisma.lobbyMembership.createMany({ data });
+
+        return { added: newUserIds.length, addedUserIds: newUserIds };
+    },
+
 
     // Remove a member
     async removeMember(lobbyId: string, userId: string) {

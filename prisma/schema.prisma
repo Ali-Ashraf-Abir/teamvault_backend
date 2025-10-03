@@ -21,7 +21,7 @@ enum ServerRole {
   owner
   admin
   member
-  guest
+  moderator
 }
 
 enum InviteStatus {
