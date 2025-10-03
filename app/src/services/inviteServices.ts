@@ -75,9 +75,9 @@ class InviteService {
         return { invite: updatedInvite, redemption };
     }
 
-    async revokeInvite(code: string) {
+    async revokeInvite(inviteId: string) {
         return prisma.serverInvite.update({
-            where: { code },
+            where: { inviteId },
             data: { revoked: true }
         });
     }

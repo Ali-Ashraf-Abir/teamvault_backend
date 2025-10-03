@@ -36,11 +36,11 @@ class InviteController {
 
     async revokeInvite(req: Request, res: Response) {
         try {
-            const { code } = req.params;
-            const revoked = await inviteServices.revokeInvite(code);
-            res.json(revoked);
+            const { inviteId } = req.params;
+            const revoked = await inviteServices.revokeInvite(inviteId);
+            res.json({ok:true,revoked});
         } catch (err: any) {
-            res.status(400).json({ error: err.message });
+            res.status(400).json({ok:false, error: err.message });
         }
     }
 

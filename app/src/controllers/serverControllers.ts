@@ -24,8 +24,7 @@ export const createServerController = async (req: Request, res: Response) => {
 
 export const getServerByIdController = async (req: Request, res: Response) => {
   const serverId = req.params.id
-  const result = getServerService(serverId)
-
+  const result = await getServerService(serverId)
   res.send(result)
 }
 

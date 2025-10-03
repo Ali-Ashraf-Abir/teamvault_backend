@@ -29,6 +29,13 @@ export const getServerService = async (id: string) => {
   try {
     const data = await prisma.server.findUnique({
       where: { serverId: id },
+      include:{
+        members:{
+          include:{
+            user:true,
+          }
+        }
+      }
     });
 
     if (!data) {

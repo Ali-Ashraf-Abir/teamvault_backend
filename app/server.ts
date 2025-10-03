@@ -3,6 +3,7 @@ import authRouter from './src/routes/authRoutes'
 import userRouter from './src/routes/userRoutes'
 import serverRouter from './src/routes/serverRoutes'
 import inviteRoutes from './src/routes/inviteRoutes'
+import lobbyRoutes from './src/routes/lobbyRoutes'
 import { fail } from './src/utils/http';
 import { errorHandler } from './src/middleware/error';
 import { requireAuth } from './src/middleware/authMiddleware';
@@ -33,6 +34,7 @@ app.use('/api',authRouter);
 app.use('/api',serverRouter)
 app.use('/api',userRouter);
 app.use('/api',inviteRoutes)
+app.use('/api',lobbyRoutes)
 // error middlewares
 app.use((req, res) => fail(res, "NOT_FOUND", "Route not found", 404));
 app.use(errorHandler);
