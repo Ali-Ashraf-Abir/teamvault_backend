@@ -76,6 +76,21 @@ export const LobbyService = {
             },
         });
     },
+    async getLobbiesByUserAndServerService(serverId: string, userId: string) {
+        return await prisma.lobby.findMany({
+            where: {
+                serverId,
+                members: {
+                    some: { userId },
+                },
+            },
+            include: {
+                members: {
+                    select: { userId: true },
+                },
+            },
+        });
+    },
 
     // Update lobby name
     async updateLobby(lobbyId: string, lobbyName: string) {

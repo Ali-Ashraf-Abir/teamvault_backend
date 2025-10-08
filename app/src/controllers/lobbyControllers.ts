@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { LobbyService } from "../services/lobbyServices";
+import { fail } from "../utils/http";
 
 export const LobbyController = {
   async createLobby(req: Request, res: Response) {
@@ -30,6 +31,24 @@ export const LobbyController = {
       res.json(lobby);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
+    }
+  },
+
+
+  async getLobbiesByUserAndServer (req: Request, res: Response) {
+    try {
+      const { serverId, userId } = req.params;
+
+      if (!serverId || !userId) {
+        return fail(res, "BAD_REQUEST", "Missing serverId or userId", 400);
+      }
+
+      const lobbies = await LobbyService.getLobbiesByUserAndServerService(serverId, userId);
+
+      return res.json({ok:true , lobbies});
+    } catch (error) {
+      console.error("Error in getLobbiesByUserAndServer:", error);
+      return fail(res, "SERVER_ERROR", "Failed to fetch lobbies", 500);
     }
   },
 
@@ -77,23 +96,23 @@ export const LobbyController = {
 
 
 
-    async addMembers(req: Request, res: Response) {
-      try {
-        const { lobbyId } = req.params;
-        const { userIds, role } = req.body;
+  async addMembers(req: Request, res: Response) {
+    try {
+      const { lobbyId } = req.params;
+      const { userIds, role } = req.body;
 
-        if (!Array.isArray(userIds) || userIds.length === 0) {
-          return res.status(400).json({ error: "userIds must be a non-empty array" });
-        }
-
-        const result = await LobbyService.addMembers(lobbyId, userIds, role);
-
-        res.json({ok:true,result});
-      } catch (error: any) {
-        console.error(error);
-        res.status(500).json({ok:false, error: error.message });
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ error: "userIds must be a non-empty array" });
       }
-    },
+
+      const result = await LobbyService.addMembers(lobbyId, userIds, role);
+
+      res.json({ ok: true, result });
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json({ ok: false, error: error.message });
+    }
+  },
 
 
 };
