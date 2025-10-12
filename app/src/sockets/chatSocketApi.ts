@@ -42,7 +42,7 @@ export function chatSocketApi(io: Server, socket: Socket) {
       message: string;
     }) => {
       try {
-        // 🧩 Step 1: Check membership
+
         const isMember = await prisma.lobbyMembership.findUnique({
           where: { lobbyId_userId: { lobbyId, userId: sentBy } },
         });
@@ -52,19 +52,16 @@ export function chatSocketApi(io: Server, socket: Socket) {
           return;
         }
 
-        // 💬 Step 2: Create chat message
         const chat = await prisma.chat.create({
           data: { serverId, lobbyId, sentBy, message },
           include: { sender: true },
         });
 
-        // 👥 Step 3: Get all lobby members (recipients)
         const lobbyMembers = await prisma.lobbyMembership.findMany({
           where: { lobbyId },
           select: { userId: true },
         });
 
-        // 📨 Step 4: Create notifications for all except sender
         const notificationsData = lobbyMembers
           .filter((m) => m.userId !== sentBy)
           .map((m) => ({
@@ -76,7 +73,7 @@ export function chatSocketApi(io: Server, socket: Socket) {
             chatId: chat.chatId,
             title: `New message from ${chat.sender.firstName} ${chat.sender.lastName}`,
             message: chat.message.length > 60 ? chat.message.slice(0, 60) + "..." : chat.message,
-            link: `/servers/${serverId}/lobbies/${lobbyId}`,
+            link: `/server/${serverId}/lobbies/${lobbyId}`,
           }));
 
         if (notificationsData.length > 0) {
@@ -85,22 +82,18 @@ export function chatSocketApi(io: Server, socket: Socket) {
           });
         }
 
-        // ⚡ Step 5: Broadcast message to all lobby members
+        // emitting real time chats and notifications back to the frontend
         io.to(lobbyId).emit("new_message", chat);
-        // io.to(lobbyId).emit("new_notification",{
-        //       type: "LOBBY_MESSAGE",
-        //       title: `New message from ${chat.sender.firstName}`,
-        //       message: chat.message,
-        //       link: `/server/${serverId}/lobbies/${lobbyId}`,
-        //     })
         for (const member of lobbyMembers) {
           if (member.userId !== sentBy) {
             const targetSocketId = userSocketMap.get(member.userId);
             io.to(targetSocketId).emit("new_notification", {
-              type: "LOBBY_MESSAGE",
+              type: "message",
               title: `New message from ${chat.sender.firstName}`,
               message: chat.message,
+              lobbyId,
               link: `/server/${serverId}/lobbies/${lobbyId}`,
+              createdAt: new Date()
             });
           }
         }
