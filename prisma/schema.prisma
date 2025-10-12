@@ -31,6 +31,14 @@ enum InviteStatus {
   expired
 }
 
+enum NotificationType {
+  message
+  dm
+  user_invite
+  file_shared
+  system
+}
+
 /////////////////////////////////
 // MODELS
 /////////////////////////////////
@@ -51,6 +59,8 @@ model User {
   redemptions InviteRedemption[]
   sentInvites     UserInvite[] @relation("UserInviteSender")
   receivedInvites UserInvite[] @relation("UserInviteReceiver")
+  sentNotifications Notification[] @relation("NotificationSender")
+  recievedNotifications Notification[] @relation("NotificationRecipient")
   tokenVersion  Int     @default(0)
 }
 
@@ -68,6 +78,7 @@ model Server {
   lobbyMemberships LobbyMembership[]
   inviteLinks      ServerInvite[] 
   userInvites UserInvite[] @relation("inviteForServer")
+  notifications Notification[]
   @@index([createdBy])
 }
 
@@ -95,7 +106,7 @@ model Lobby {
   server  Server            @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
   members LobbyMembership[]
   chats   Chat[]
-
+  notifications Notification[]
   // Prevent duplicate lobby names within a server
   @@unique([serverId, lobbyName])
   @@index([serverId])
@@ -132,6 +143,7 @@ model Chat {
   server          Server            @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
   lobby           Lobby             @relation(fields: [lobbyId], references: [lobbyId], onDelete: Cascade)
   sender          User              @relation("ChatSender", fields: [sentBy], references: [userId], onDelete: SetNull)
+  notifications Notification[]
   ChatReadReceipt ChatReadReceipt[]
 
   // Hot-path indexes for feeds & moderation views
@@ -198,8 +210,39 @@ model UserInvite {
   server Server @relation("inviteForServer",fields: [serverId], references: [serverId], onDelete: Cascade)
   sender User   @relation("UserInviteSender", fields: [invitedBy], references: [userId], onDelete: Cascade)
   invitedUser User @relation("UserInviteReceiver", fields: [invitedUserId], references: [userId], onDelete: Cascade)
-
+  notifications Notification[]
   @@index([serverId])
   @@index([invitedUserId])
 }
 
+model Notification {
+  notificationId String  @id @default(uuid()) @db.Uuid
+  type           NotificationType
+  senderId       String?   @db.Uuid         // Who triggered it (null if system-generated)
+  recipientId    String    @db.Uuid         // Who receives it
+
+  serverId       String?   @db.Uuid         // Optional (for server-related events)
+  lobbyId        String?   @db.Uuid         // Optional (for lobby-specific messages)
+  chatId         String?   @db.Uuid         // Optional (for message-related)
+  fileId         String?   @db.Uuid         // Optional (for file-related)
+  inviteId       String?   @db.Uuid         // Optional (for user invites)
+  
+  title          String?                     // Short notification title (e.g., "New message in #general")
+  message        String?                     // Optional message preview / description
+  link           String?                     // Optional link to redirect in frontend
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  // RELATIONS
+  sender     User?          @relation("NotificationSender", fields: [senderId], references: [userId], onDelete: SetNull)
+  recipient  User           @relation("NotificationRecipient", fields: [recipientId], references: [userId], onDelete: Cascade)
+  server     Server?        @relation(fields: [serverId], references: [serverId], onDelete: Cascade)
+  lobby      Lobby?         @relation(fields: [lobbyId], references: [lobbyId], onDelete: Cascade)
+  chat       Chat?          @relation(fields: [chatId], references: [chatId], onDelete: Cascade)
+  userInvite UserInvite?    @relation(fields: [inviteId], references: [inviteId], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([serverId])
+  @@index([lobbyId])
+  @@index([chatId])
+}
