@@ -33,7 +33,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api', authRouter);
 
 // auth api
-// app.use(requireAuth)
+app.use(requireAuth)
 
 // auth protected routes
 app.use('/api', serverRouter)

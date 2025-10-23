@@ -9,3 +9,12 @@ export async function getUserByIdService(id:string){
     if(!user) return {ok:false as const, message:"User not found"}
     return {ok:true as const, user}
 }
+
+export async function getUserByEmailService(email:string){
+    const user = await prisma.user.findUnique({where:{email:email} ,
+        select:{userId:true, email:true, firstName:true, lastName:true}}
+        
+    )
+    if(!user) return {ok:false as const, message:"User not found"}
+    return {ok:true as const, user}
+}

@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import type { Server as HttpServer } from "http";
 import { chatSocketApi } from "./chatSocketApi";
 import { lobbyLoad } from "./lobbySocketApi";
+import { inviteSent } from "./inviteSocketApi";
 
 
 
@@ -31,6 +32,7 @@ export function initSocket(httpServer: HttpServer) {
 
         chatSocketApi(io, socket);
         lobbyLoad(socket,io)
+        inviteSent(socket,io)
         // notificationSocketApi(io, socket);
 
         socket.on("disconnect", () => {

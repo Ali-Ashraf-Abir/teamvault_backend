@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import inviteServices from "../services/inviteServices";
+import inviteServices, { userInviteService } from "../services/inviteServices";
 
 
 class InviteController {
@@ -66,4 +66,64 @@ class InviteController {
     }
 }
 
+
+
 export default new InviteController();
+
+export const userInviteController = {
+  async send(req: Request, res: Response): Promise<void> {
+    const { serverId, invitedBy, invitedUserId } = req.body;
+    try {
+      const invite = await userInviteService.sendInvite(serverId, invitedBy, invitedUserId);
+      res.status(201).json(invite);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  },
+
+  async getReceived(req: Request, res: Response): Promise<void> {
+    try {
+      const invites = await userInviteService.getReceivedInvites(req.params.userId);
+      res.json(invites);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  async getSent(req: Request, res: Response): Promise<void> {
+    try {
+      const invites = await userInviteService.getSentInvites(req.params.userId);
+      res.json(invites);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  async accept(req: Request, res: Response): Promise<void> {
+    try {
+      const invite = await userInviteService.acceptInvite(req.params.inviteId);
+      res.json(invite);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  },
+
+  async reject(req: Request, res: Response): Promise<void> {
+    try {
+      const invite = await userInviteService.rejectInvite(req.params.inviteId);
+      res.json(invite);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  },
+
+  async cancel(req: Request, res: Response): Promise<void> {
+    const { userId } = req.body;
+    try {
+      const invite = await userInviteService.cancelInvite(req.params.inviteId, userId);
+      res.json(invite);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  },
+};

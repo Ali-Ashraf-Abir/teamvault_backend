@@ -1,5 +1,6 @@
 import { addDays } from "date-fns";
 import { prisma } from "../../db/prisma";
+import { InviteStatus, UserInvite } from "@prisma/client";
 
 
 class InviteService {
@@ -112,3 +113,121 @@ class InviteService {
 }
 
 export default new InviteService();
+
+export const userInviteService = {
+    async sendInvite(serverId: string, invitedBy: string, invitedUserId: string): Promise<UserInvite> {
+        const existing = await prisma.userInvite.findFirst({
+            where: { serverId, invitedBy, invitedUserId, status: InviteStatus.pending },
+        });
+        if (existing) throw new Error("Invite already sent");
+
+        return prisma.userInvite.create({
+            data: { serverId, invitedBy, invitedUserId },
+            include: {
+                invitedUser: {
+                    select: { userId: true, firstName: true, lastName: true }
+                }
+            }
+        });
+    },
+
+    async getReceivedInvites(userId: string) {
+        return prisma.userInvite.findMany({
+            where: {
+                invitedUserId: userId,
+                NOT: { status: "cancelled" }
+            },
+            include: {
+                sender: { select: { userId: true, firstName: true, lastName: true } },
+                server: { select: { serverId: true, serverName: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+    },
+
+    async getSentInvites(userId: string) {
+        return prisma.userInvite.findMany({
+            where: {
+                invitedBy: userId,
+                NOT: { status: "cancelled" }
+            },
+            include: {
+                invitedUser: { select: { userId: true, firstName: true, lastName: true } },
+                server: { select: { serverId: true, serverName: true } },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+    },
+
+    async acceptInvite(inviteId: string) {
+
+        const invite = await prisma.userInvite.update({
+            where: { inviteId },
+            data: { status: InviteStatus.accepted },
+        });
+
+        await prisma.serverMembership.upsert({
+            where: { serverId_userId: { serverId: invite.serverId, userId: invite.invitedUserId } },
+            update: {},
+            create: {
+                serverId: invite.serverId,
+                userId: invite.invitedUserId,
+                role: "member",
+            },
+        });
+
+
+        const publicLobbies = await prisma.lobby.findMany({
+            where: {
+                serverId: invite.serverId,
+                isPrivate: false,
+            },
+            select: { lobbyId: true },
+        });
+
+
+        if (publicLobbies.length > 0) {
+            await prisma.$transaction(
+                publicLobbies.map(lobby =>
+                    prisma.lobbyMembership.upsert({
+                        where: {
+                            lobbyId_userId: {
+                                lobbyId: lobby.lobbyId,
+                                userId: invite.invitedUserId,
+                            },
+                        },
+                        update: {},
+                        create: {
+                            lobbyId: lobby.lobbyId,
+                            userId: invite.invitedUserId,
+                            serverId: invite.serverId,
+                            role: "member",
+                        },
+                    })
+                )
+            );
+        }
+
+        return invite;
+    },
+
+    async rejectInvite(inviteId: string): Promise < UserInvite > {
+    return prisma.userInvite.update({
+        where: { inviteId },
+        data: { status: InviteStatus.rejected },
+    });
+},
+
+    async cancelInvite(inviteId: string, userId: string): Promise < UserInvite > {
+        const invite = await prisma.userInvite.findUnique({ where: { inviteId } });
+        if(!invite) throw new Error("Invite not found");
+        if(invite.invitedBy !== userId) throw new Error("Unauthorized");
+
+        return prisma.userInvite.update({
+            where: { inviteId },
+            data: { status: InviteStatus.cancelled },
+        });
+    },
+};
+
+

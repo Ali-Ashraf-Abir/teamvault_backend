@@ -29,6 +29,7 @@ enum InviteStatus {
   accepted
   rejected
   expired
+  cancelled
 }
 
 enum NotificationType {
